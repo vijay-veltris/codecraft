@@ -12,6 +12,7 @@ import { prompts, history, users, gitConnections } from "@shared/schema";
 import OpenAI from "openai";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
+import { generateReactProject } from "./scripts/generate-react-project";
 
 // Create a basic OpenAI client without WebSocket connections
 // This configuration avoids ECONNREFUSED errors in local development
@@ -185,6 +186,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error fetching user profile:", error);
       res.status(500).json({ message: "Error fetching user profile" });
+    }
+  });
+
+  // Generate React project
+  app.post("/api/generate/react", async (req, res) => {
+    try {
+      const { name, description, author } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Project name is required" 
+        });
+      }
+
+      const result = await generateReactProject({
+        name,
+        description: description || "",
+        author: author || ""
+      });
+
+      res.json({
+        success: true,
+        message: result.message,
+        path: result.path
+      });
+    } catch (error: any) {
+      console.error("Error generating React project:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error generating React project" 
+      });
     }
   });
 
