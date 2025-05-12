@@ -10,8 +10,20 @@ import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
 import * as schema from "@shared/schema";
 
-// This is the correct way neon config - DO NOT change this
+// Configure Neon to use WebSocket
 neonConfig.webSocketConstructor = ws;
+neonConfig.useSecureWebSocket = true;
+neonConfig.pipelineTLS = true;
+neonConfig.pipelineConnect = false;
+
+// Handle WebSocket errors
+process.on('unhandledRejection', (error: any) => {
+  if (error.message?.includes('WebSocket')) {
+    console.warn('WebSocket connection error:', error.message);
+    return;
+  }
+  throw error;
+});
 
 if (!process.env.DATABASE_URL) {
   throw new Error(

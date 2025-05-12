@@ -11,88 +11,154 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { CodePrompt } from "@/lib/openai";
+import { CodePrompt, generateReactProject } from "@/lib/openai";
 import { Play, Share2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { LLMSelector, type LLMProvider } from './llm-selector';
 
 interface PromptInputProps {
-  onSubmit: (promptData: CodePrompt) => void;
-  isLoading: boolean;
+  onSubmit: (data: {
+    prompt: string;
+    language: string;
+    llmProvider: LLMProvider;
+    llmConfig?: {
+      apiKey?: string;
+      baseUrl?: string;
+      model?: string;
+    };
+  }) => void;
+  isLoading?: boolean;
 }
 
 export function PromptInput({ onSubmit, isLoading }: PromptInputProps) {
   const [prompt, setPrompt] = useState("");
-  const [language, setLanguage] = useState<string | undefined>(undefined);
+  const [language, setLanguage] = useState("javascript");
   const [includeComments, setIncludeComments] = useState(true);
+  const [llmProvider, setLlmProvider] = useState<LLMProvider>("openai");
+  const [apiKey, setApiKey] = useState("");
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
-    
+
+    if (language === "React") {
+      try {
+        const result = await generateReactProject(
+          prompt || "react-app",
+          "A React application generated with CodeCrafter",
+          "CodeCrafter User"
+        );
+        
+        if (result.success) {
+          toast({
+            title: "Success",
+            description: result.message,
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: result.message || "Failed to generate React project",
+            variant: "destructive",
+          });
+        }
+        return;
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to generate React project",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     onSubmit({
-      prompt,
-      language: language === "Any Language" ? undefined : language,
-      includeComments,
+      prompt: prompt.trim(),
+      language,
+      llmProvider,
+      llmConfig: llmProvider === "openai" ? { apiKey } : undefined
     });
   };
 
   return (
-    <Card className="bg-card mb-6">
-      <CardContent className="p-4">
-        <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-semibold">Prompt</h2>
-          <div>
-            <Button variant="ghost" size="icon">
-              <Share2 className="h-5 w-5" />
-            </Button>
+    <Card className="mb-8">
+      <CardContent className="pt-6">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="prompt">What would you like to create?</Label>
+            <Textarea
+              id="prompt"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Describe what you want to build..."
+              className="min-h-[100px]"
+            />
           </div>
-        </div>
-        
-        <form onSubmit={handleSubmit}>
-          <Textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the code you want to generate..."
-            className="min-h-32 px-3 py-2 bg-background text-foreground code-font resize-y mb-3"
-          />
-          
-          <div className="flex flex-wrap justify-between mt-3 items-center">
-            <div className="flex items-center space-x-4">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="language">Programming Language</Label>
               <Select value={language} onValueChange={setLanguage}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Any Language" />
+                <SelectTrigger id="language">
+                  <SelectValue placeholder="Select language" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Any Language">Any Language</SelectItem>
-                  <SelectItem value="Python">Python</SelectItem>
-                  <SelectItem value="JavaScript">JavaScript</SelectItem>
-                  <SelectItem value="TypeScript">TypeScript</SelectItem>
-                  <SelectItem value="React">React</SelectItem>
-                  <SelectItem value="HTML/CSS">HTML/CSS</SelectItem>
-                  <SelectItem value="Java">Java</SelectItem>
-                  <SelectItem value="C#">C#</SelectItem>
-                  <SelectItem value="PHP">PHP</SelectItem>
-                  <SelectItem value="Go">Go</SelectItem>
-                  <SelectItem value="Ruby">Ruby</SelectItem>
+                  <SelectItem value="javascript">JavaScript</SelectItem>
+                  <SelectItem value="typescript">TypeScript</SelectItem>
+                  <SelectItem value="python">Python</SelectItem>
+                  <SelectItem value="java">Java</SelectItem>
+                  <SelectItem value="csharp">C#</SelectItem>
+                  <SelectItem value="cpp">C++</SelectItem>
+                  <SelectItem value="go">Go</SelectItem>
+                  <SelectItem value="rust">Rust</SelectItem>
                 </SelectContent>
               </Select>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="comments" 
-                  checked={includeComments}
-                  onCheckedChange={(checked) => setIncludeComments(checked === true)}
-                />
-                <Label htmlFor="comments" className="text-sm">Include comments</Label>
-              </div>
             </div>
-            
-            <Button 
-              type="submit" 
-              className="mt-2 sm:mt-0"
-              disabled={!prompt.trim() || isLoading}
-            >
-              <Play className="h-4 w-4 mr-2" />
-              Generate
+
+            <LLMSelector
+              value={llmProvider}
+              onChange={setLlmProvider}
+              className="space-y-2"
+            />
+          </div>
+
+          {llmProvider === "openai" && (
+            <div className="space-y-2">
+              <Label htmlFor="api-key">OpenAI API Key (optional)</Label>
+              <input
+                id="api-key"
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-..."
+                className="w-full px-3 py-2 border rounded-md"
+              />
+            </div>
+          )}
+
+          <div className="flex flex-wrap justify-between mt-3 items-center">
+            <div className="flex items-center space-x-4">
+              <Checkbox 
+                id="comments" 
+                checked={includeComments}
+                onCheckedChange={(checked) => setIncludeComments(checked === true)}
+              />
+              <Label htmlFor="comments" className="text-sm">Include comments</Label>
+            </div>
+
+            <Button type="submit" disabled={isLoading || !prompt.trim()}>
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Generating...
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Play className="h-4 w-4" />
+                  {language === "React" ? "Generate Project" : "Generate Code"}
+                </div>
+              )}
             </Button>
           </div>
         </form>

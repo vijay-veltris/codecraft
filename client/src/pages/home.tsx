@@ -19,6 +19,19 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { LLMProvider } from '../components/llm-selector';
+
+interface CodeSnippet {
+  id: string;
+  content: string;
+  language: string;
+  llmProvider: LLMProvider;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
 
 export default function Home() {
   const [snippets, setSnippets] = useState<CodeSnippet[]>([]);

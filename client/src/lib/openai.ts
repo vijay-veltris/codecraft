@@ -1,16 +1,29 @@
 import { apiRequest } from "@/lib/queryClient";
+import type { LLMProvider } from '../components/llm-selector';
 
 export interface CodePrompt {
   prompt: string;
-  language?: string;
-  includeComments?: boolean;
+  language: string;
+  llmProvider: LLMProvider;
+  llmConfig?: {
+    apiKey?: string;
+    baseUrl?: string;
+    model?: string;
+  };
 }
 
 export interface CodeSnippet {
   id: string;
-  filename: string;
-  code: string;
+  filename?: string;
+  content: string;
+  code?: string;
   language: string;
+  llmProvider: LLMProvider;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 export interface GenerateCodeResponse {
@@ -20,15 +33,27 @@ export interface GenerateCodeResponse {
   message?: string;
 }
 
-export async function generateCode(promptData: CodePrompt): Promise<GenerateCodeResponse> {
-  try {
-    const response = await apiRequest("POST", "/api/generate", promptData);
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error("Error generating code:", error);
-    throw error;
+export interface GenerateReactProjectResponse {
+  success: boolean;
+  message: string;
+  path: string;
+}
+
+export async function generateCode(prompt: CodePrompt): Promise<CodeSnippet[]> {
+  const response = await fetch('/api/generate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(prompt),
+  });
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.error || 'Failed to generate code');
   }
+
+  return result.snippets;
 }
 
 export async function fetchHistory() {
@@ -60,6 +85,17 @@ export async function fetchUserProfile() {
     return data;
   } catch (error) {
     console.error("Error fetching user profile:", error);
+    throw error;
+  }
+}
+
+export async function generateReactProject(name: string, description?: string, author?: string): Promise<GenerateReactProjectResponse> {
+  try {
+    const response = await apiRequest("POST", "/api/generate/react", { name, description, author });
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error generating React project:", error);
     throw error;
   }
 }

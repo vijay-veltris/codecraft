@@ -13,6 +13,9 @@ import OpenAI from "openai";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { generateReactProject } from "./scripts/generate-react-project";
+import { Router } from 'express';
+import { z } from 'zod';
+import { createLLMService, LLMProvider } from './lib/llm';
 
 // Create a basic OpenAI client without WebSocket connections
 // This configuration avoids ECONNREFUSED errors in local development
@@ -22,80 +25,56 @@ const openai = new OpenAI({
   dangerouslyAllowBrowser: false // Prevent browser usage
 });
 
+const generateSchema = z.object({
+  prompt: z.string().min(1),
+  language: z.string().min(1),
+  llmProvider: LLMProvider,
+  llmConfig: z.object({
+    apiKey: z.string().optional(),
+    baseUrl: z.string().optional(),
+    model: z.string().optional()
+  }).optional()
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Generate code from prompt
   app.post("/api/generate", async (req, res) => {
     try {
-      const { prompt, language, includeComments } = req.body;
+      const { prompt, language, llmProvider, llmConfig } = generateSchema.parse(req.body);
       
-      if (!prompt) {
-        return res.status(400).json({ 
-          success: false, 
-          message: "Prompt is required" 
-        });
-      }
+      const llmService = createLLMService({
+        provider: llmProvider,
+        ...llmConfig
+      });
 
-      // Format the prompt to include language and comment preferences
-      let formattedPrompt = prompt;
-      if (language) {
-        formattedPrompt = `Generate ${language} code: ${prompt}`;
-      }
-      if (includeComments === false) {
-        formattedPrompt += ". Don't include comments in the code.";
-      }
+      const response = await llmService.generateCode(prompt, language);
+      
+      // Store in history
+      const historyItem = await storage.savePrompt({
+        id: nanoid(),
+        prompt,
+        language,
+        response: response.content,
+        timestamp: new Date(),
+        llmProvider
+      });
 
-      try {
-        // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-        const completion = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "system",
-              content: "You are CodeCraft AI, a specialized code generation assistant. Return code in neat, well-structured snippets. When generating multiple files, separate them clearly with filenames. Focus on producing clean, efficient, well-documented, production-ready code. If a specific language is requested, use that language."
-            },
-            {
-              role: "user",
-              content: formattedPrompt
-            }
-          ],
-        });
-
-        // Extract code snippets from response
-        const responseText = completion.choices[0].message.content || "";
-        
-        // Parse code snippets from the response
-        const codeSnippets = parseCodeSnippets(responseText);
-        
-        // Save prompt and response to database
-        const promptId = nanoid();
-        const timestamp = new Date();
-        
-        await storage.savePrompt({
-          id: promptId,
-          prompt,
-          language: language || "Any Language",
-          response: responseText,
-          timestamp
-        });
-        
-        // Return the code snippets
-        res.json({
-          success: true,
-          snippets: codeSnippets,
-          promptId
-        });
-      } catch (error: any) {
-        console.error("OpenAI API error:", error);
-        res.status(500).json({ 
-          success: false, 
-          message: "Error generating code. Please try again." 
-        });
-      }
-    } catch (error: any) {
-      console.error("Error in /api/generate:", error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Internal server error" 
+      res.json({
+        success: true,
+        snippets: [{
+          id: nanoid(),
+          content: response.content,
+          language,
+          llmProvider,
+          usage: response.usage
+        }],
+        historyId: historyItem.id
+      });
+    } catch (error) {
+      console.error('Error generating code:', error);
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate code'
       });
     }
   });
