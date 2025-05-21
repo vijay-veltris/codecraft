@@ -42,7 +42,10 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
   // Map file extensions to Prism language
-  const getLanguageFromFilename = (filename: string): string => {
+  const getLanguageFromFilename = (filename?: string): string => {
+    if (!filename) {
+      return snippet.language.toLowerCase() || 'plaintext';
+    }
     const extension = filename.split('.').pop()?.toLowerCase();
     const languageMap: Record<string, string> = {
       'js': 'javascript',
@@ -79,7 +82,7 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
   // Highlight code with Prism
   const highlightCode = () => {
     const highlighted = Prism.highlight(
-      snippet.code,
+      snippet.content,
       Prism.languages[language] || Prism.languages.plaintext,
       language
     );
@@ -87,18 +90,18 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
   };
   
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(snippet.code);
+    navigator.clipboard.writeText(snippet.content);
     toast({
       title: "Copied to clipboard",
-      description: `${snippet.filename} has been copied to your clipboard.`,
+      description: `${snippet.filename || 'Code snippet'} has been copied to your clipboard.`,
     });
   };
   
   const downloadFile = () => {
     const element = document.createElement("a");
-    const file = new Blob([snippet.code], { type: 'text/plain' });
+    const file = new Blob([snippet.content], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
-    element.download = snippet.filename;
+    element.download = snippet.filename || `code.${language}`;
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
@@ -107,7 +110,7 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
   // Generate HTML for preview iframe
   const generatePreviewHtml = (): string => {
     if (language === 'html') {
-      return snippet.code;
+      return snippet.content;
     } else if (language === 'javascript' || language === 'js') {
       return `
         <!DOCTYPE html>
@@ -186,7 +189,7 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
             };
             
             try {
-              ${snippet.code}
+              ${snippet.content}
             } catch (error) {
               console.error('Error: ' + error.message);
               
@@ -208,7 +211,7 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
           <meta charset="UTF-8">
           <title>CSS Preview</title>
           <style>
-            ${snippet.code}
+            ${snippet.content}
           </style>
         </head>
         <body>
@@ -319,7 +322,7 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
       <div className="code-snippet bg-card rounded-lg shadow-md overflow-hidden">
         <div className="flex justify-between items-center px-4 py-2 bg-muted border-b border-border">
           <div className="flex items-center">
-            <span className="text-sm font-medium text-foreground">{snippet.filename}</span>
+            <span className="text-sm font-medium text-foreground">{snippet.filename || `Code (${language})`}</span>
             <span 
               className={`ml-2 px-2 py-0.5 text-xs rounded-full ${getLanguageBadgeColor(language)}`}
             >
@@ -383,7 +386,7 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
         <DialogContent className="max-w-5xl h-[80vh] flex flex-col p-0">
           <DialogHeader className="px-4 py-2 border-b">
             <DialogTitle className="flex items-center text-base">
-              <span className="text-foreground">{snippet.filename}</span>
+              <span className="text-foreground">{snippet.filename || `Code (${language})`}</span>
               <span 
                 className={`ml-2 px-2 py-0.5 text-xs rounded-full ${getLanguageBadgeColor(language)}`}
               >
@@ -439,7 +442,7 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
         <DialogContent className="max-w-5xl h-[80vh] flex flex-col p-0">
           <DialogHeader className="px-4 py-2 border-b">
             <DialogTitle className="flex items-center text-base">
-              <span className="text-foreground">Preview: {snippet.filename}</span>
+              <span className="text-foreground">Preview: {snippet.filename || `Code (${language})`}</span>
               <span 
                 className={`ml-2 px-2 py-0.5 text-xs rounded-full ${getLanguageBadgeColor(language)}`}
               >
@@ -472,7 +475,7 @@ export function CodeSnippetCard({ snippet }: CodeSnippetCardProps) {
                   ref={iframeRef}
                   className="w-full h-full border-0 rounded bg-white" 
                   sandbox="allow-scripts allow-same-origin"
-                  title={`Preview of ${snippet.filename}`}
+                  title={`Preview of ${snippet.filename || `Code (${language})`}`}
                 ></iframe>
               </div>
             </TabsContent>

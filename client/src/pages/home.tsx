@@ -43,13 +43,16 @@ export default function Home() {
   const generateMutation = useMutation({
     mutationFn: (promptData: CodePrompt) => generateCode(promptData),
     onSuccess: (data) => {
+      console.log('Mutation Success Data:', data);
       if (data.success && data.snippets) {
+        console.log('Setting snippets:', data.snippets);
         setSnippets(data.snippets);
         if (data.promptId) {
           // Invalidate history query to refresh sidebar
           queryClient.invalidateQueries({ queryKey: ['/api/history'] });
         }
       } else {
+        console.log('Mutation Success but no snippets:', data);
         toast({
           title: "Generation Failed",
           description: data.message || "Something went wrong. Please try again.",
@@ -58,6 +61,7 @@ export default function Home() {
       }
     },
     onError: (error) => {
+      console.error('Mutation Error:', error);
       const errorMessage = error instanceof Error ? error.message : "Failed to generate code. Please try again.";
       
       // Check for specific OpenAI API key errors to provide better guidance

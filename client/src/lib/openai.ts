@@ -39,7 +39,7 @@ export interface GenerateReactProjectResponse {
   path: string;
 }
 
-export async function generateCode(prompt: CodePrompt): Promise<CodeSnippet[]> {
+export async function generateCode(prompt: CodePrompt): Promise<GenerateCodeResponse> {
   const response = await fetch('/api/generate', {
     method: 'POST',
     headers: {
@@ -49,11 +49,15 @@ export async function generateCode(prompt: CodePrompt): Promise<CodeSnippet[]> {
   });
 
   const result = await response.json();
+  console.log('Generate API Response:', result);
+
   if (!result.success) {
+    console.error('Generate API Error:', result.error);
     throw new Error(result.error || 'Failed to generate code');
   }
 
-  return result.snippets;
+  console.log('Returning response:', result);
+  return result;
 }
 
 export async function fetchHistory() {
